@@ -3,6 +3,9 @@
 基于 MCP 工具的多智能体交易分析系统
 <img width="2463" height="1211" alt="image" src="https://github.com/user-attachments/assets/5ab6e99b-cbf6-493b-b10d-fd27615ed207" />
 <img width="2550" height="1236" alt="image" src="https://github.com/user-attachments/assets/ee21ccfc-0671-4b72-a6e7-0edf72fafc37" />
+<img width="1980" height="1092" alt="image" src="https://github.com/user-attachments/assets/d356a1e5-1975-4f3f-aad0-8c5937ab78cf" />
+<img width="2549" height="1227" alt="image" src="https://github.com/user-attachments/assets/36838fa2-7524-4eee-bf3b-1cf83cb4893e" />
+
 
 
 ## 项目概述
