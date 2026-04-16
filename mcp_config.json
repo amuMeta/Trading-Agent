@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "stock-mcp": {
+      "timeout": 600,
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:9898/mcp",
+      "headers": {}
+    }
+  }
+}

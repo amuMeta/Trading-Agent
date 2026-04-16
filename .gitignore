@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Environment files (keep .env.example)
+.env
+
+# Logs
+*.log
+api.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Build outputs
+frontend/.next/
+frontend/out/
+build/
+dist/
+
+# Temporary files
+*.tmp
+*.temp
+nul
+
+# Dump files (session data)
+src/dump/
