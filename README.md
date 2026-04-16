@@ -1,6 +1,9 @@
 # TradingAgents-MCPmode
 
 基于 MCP 工具的多智能体交易分析系统
+<img width="2463" height="1211" alt="image" src="https://github.com/user-attachments/assets/5ab6e99b-cbf6-493b-b10d-fd27615ed207" />
+<img width="2550" height="1236" alt="image" src="https://github.com/user-attachments/assets/ee21ccfc-0671-4b72-a6e7-0edf72fafc37" />
+
 
 ## 项目概述
 
