@@ -1,6 +1,5 @@
-"""核心模块 - 包含系统核心功能"""
+"""Core模块 - 核心功能"""
 
-from .state_manager import StateManager
-from .data_persistence import DataPersistence
+from .database import SessionDatabase
 
-__all__ = ['StateManager', 'DataPersistence']
+__all__ = ["SessionDatabase"]

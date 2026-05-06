@@ -24,7 +24,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-md px-6 py-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">TradingAgents 分析平台</h1>
+        <h1 className="text-2xl font-bold text-gray-900">trading-agent智能交易代理系统</h1>
         <div className="flex items-center gap-4">
           {username && (
             <div className="flex items-center gap-3">

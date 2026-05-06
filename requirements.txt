@@ -48,7 +48,6 @@ flake8>=6.0.0
 # 安装命令: pip install -r md_to_pdf_requirements.txt
 
 # 主要依赖
-markdown2>=2.4.0
 pdfkit>=1.0.0
 
 # 备用方案依赖（可选）
@@ -57,3 +56,21 @@ beautifulsoup4>=4.12.0
 
 # 代码高亮（可选）
 pygments>=2.15.0
+
+# ===========================================
+# RAG金融智能对话依赖
+# ===========================================
+# 向量数据库
+chromadb>=0.4.0
+
+# 中文Embedding模型
+sentence-transformers>=2.2.0
+huggingface-hub>=0.16.0
+
+# 文本处理
+pypdf>=3.0.0
+python-docx>=0.8.11
+pdfplumber>=0.10.0
+
+# 国产大模型支持
+dashscope>=1.12.0

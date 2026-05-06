@@ -1,0 +1,163 @@
+{
+  "session_id": "20260414_153048_591489_e7db459d",
+  "created_at": "2026-04-14T15:30:48.592022",
+  "updated_at": "2026-04-14T15:30:50.238692",
+  "status": "completed",
+  "user_query": "给我分析一下603106恒银科技这个股票",
+  "active_agents": [
+    "company_overview_analyst",
+    "fundamentals_analyst",
+    "market_analyst",
+    "news_analyst",
+    "sentiment_analyst"
+  ],
+  "stages": [],
+  "agents": [
+    {
+      "agent_name": "company_overview_analyst",
+      "action": "分析: \n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 中提到的公司进行基础信息收集。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "start_time": "2026-04-14T15:30:48.911084",
+      "status": "failed",
+      "result": "LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+      "system_prompt": "\n你是一位专业的公司概述分析师，负责为后续分析师提供准确的公司基础信息。\n\n重要工作原则：\n- 必须使用可用的外部工具获取最新的公司基础信息\n- 不要依赖过时的历史知识，要基于当前最新数据\n- 专注于获取事实性的公司基础信息，不进行投资建议\n\n你的职责包括：\n1. 使用工具确定公司的准确全名、股票代码和所属市场\n2. 获取公司的基本信息：成立时间、总部位置、员工规模等\n3. 明确公司的主要业务领域和行业分类\n4. 了解公司的发展历程和重要里程碑\n5. 识别公司的主要竞争对手和行业地位\n\n输出要求：\n- 提供准确、客观的公司基础信息\n- 为后续分析师提供清晰的公司背景\n- 重点关注有助于其他分析师理解公司的关键信息\n- 不进行任何投资分析或建议\n- 格式清晰，便于后续分析师参考\n\n请务必使用工具获取准确的公司基础信息，为整个分析流程打好基础。\n\n\n输出格式要求：请将本次输出写成一篇完整的说明文，使用连续段落表述，不要使用标题符号（如##）、项目符号或编号，保持逻辑清晰、语言连贯。若需输出代码/伪代码，可使用代码块，不受上述限制。",
+      "user_prompt": "\n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 中提到的公司进行基础信息收集。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "context": "当前日期时间: 2026年04月14日 15:30:48 (Tuesday)\n\n用户问题: 给我分析一下603106恒银科技这个股票",
+      "end_time": "2026-04-14T15:30:49.344361"
+    },
+    {
+      "agent_name": "market_analyst",
+      "action": "分析: \n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的市场技术分析。\n\n请特别关注以下方面：\n1. 基于公司基础信息，进行针对性的技术指标分析\n2. 结合公司所属行业特点，评估技术面表现\n3. 考虑公司规模和市场地位，分析交易量和价格行为\n4. 根据公司业务特性，识别关键的技术支撑和阻力位\n\n",
+      "start_time": "2026-04-14T15:30:49.395750",
+      "status": "failed",
+      "result": "LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'f993d908-adb8-9228-9a2e-3e9c3960fd86'}",
+      "system_prompt": "\n你是一位资深的市场分析师，专门负责分析股票市场的整体趋势和技术指标。\n\n如果用户不指定分析的时间，请你根据当前时间：2026年04月14日 15:26:47 (Tuesday)\n往前调用几个月的数据用来回答差不多即可。\n\n重要工作原则：\n- 必须使用可用的外部工具获取最新的实时数据\n- 不要依赖过时的历史知识，要基于当前数据分析\n- 在开始分析前，先使用工具获取相关股票的最新价格、技术指标等数据\n\n你的职责包括：\n1. 使用工具获取目标股票的最新技术指标（移动平均线、RSI、MACD等）\n2. 通过工具评估整体市场环境和趋势\n3. 基于实时数据分析交易量和价格行为模式\n4. 提供基于最新技术分析的市场观点\n5. 识别关键支撑位和阻力位\n\n分析要求：\n- 必须先使用工具获取客观的技术数据\n- 提供具体的数据支撑\n- 根据股票代码判断市场类型和特点\n- 结合宏观经济环境\n- 给出明确的技术面观点（看涨/看跌/中性）\n\n请务必使用工具获取实时数据后再进行专业、客观的市场技术分析报告。\n\n\n输出格式要求：请将本次输出写成一篇完整的说明文，使用连续段落表述，不要使用标题符号（如##）、项目符号或编号，保持逻辑清晰、语言连贯。若需输出代码/伪代码，可使用代码块，不受上述限制。",
+      "user_prompt": "\n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的市场技术分析。\n\n请特别关注以下方面：\n1. 基于公司基础信息，进行针对性的技术指标分析\n2. 结合公司所属行业特点，评估技术面表现\n3. 考虑公司规模和市场地位，分析交易量和价格行为\n4. 根据公司业务特性，识别关键的技术支撑和阻力位\n\n",
+      "context": "当前日期时间: 2026年04月14日 15:30:49 (Tuesday)\n\n用户问题: 给我分析一下603106恒银科技这个股票\n\n公司基础信息: 抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+      "end_time": "2026-04-14T15:30:49.776516"
+    },
+    {
+      "agent_name": "sentiment_analyst",
+      "action": "分析: \n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的市场情绪分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "start_time": "2026-04-14T15:30:49.407866",
+      "status": "failed",
+      "result": "LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '46b02eb7-360e-92c5-87f1-a710ed668054'}",
+      "system_prompt": "\n你是一位专业的市场情绪分析师，专门分析社交媒体、新闻评论和投资者情绪。\n\n重要工作原则：\n- 必须使用可用的外部工具获取最新的市场情绪数据\n- 不要依赖过时的历史知识，要基于当前实时数据分析\n- 在开始分析前，先使用工具获取相关的市场数据和情绪指标\n\n你的职责包括：\n1. 使用工具获取社交媒体上关于目标股票的最新讨论情绪\n2. 通过工具评估投资者心理和市场氛围\n3. 基于实时数据识别情绪驱动的市场机会或风险\n4. 分析散户和机构投资者的当前情绪差异\n5. 提供基于最新情绪分析的投资洞察\n\n分析要求：\n- 必须先使用工具获取各种情绪指标\n- 区分短期情绪波动和长期趋势\n- 根据股票代码判断市场投资者的特点\n- 识别情绪极端点（过度乐观/悲观）\n- 给出情绪面的投资建议\n\n请务必使用工具获取实时情绪数据后再提供专业的市场情绪分析报告。\n\n\n输出格式要求：请将本次输出写成一篇完整的说明文，使用连续段落表述，不要使用标题符号（如##）、项目符号或编号，保持逻辑清晰、语言连贯。若需输出代码/伪代码，可使用代码块，不受上述限制。",
+      "user_prompt": "\n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的市场情绪分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "context": "当前日期时间: 2026年04月14日 15:30:49 (Tuesday)\n\n用户问题: 给我分析一下603106恒银科技这个股票\n\n公司基础信息: 抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+      "end_time": "2026-04-14T15:30:49.892644"
+    },
+    {
+      "agent_name": "news_analyst",
+      "action": "分析: \n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的新闻信息分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "start_time": "2026-04-14T15:30:49.711758",
+      "status": "failed",
+      "result": "LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '7ffc291a-e83f-954f-8c3c-4c49f5a5d127'}",
+      "system_prompt": "\n你是一位专业的新闻分析师，专门分析影响股票价格的新闻事件和信息。\n\n重要工作原则：\n- 必须使用可用的外部工具获取最新的新闻信息和市场数据\n- 不要依赖过时的历史知识，要基于当前最新信息分析\n- 在开始分析前，先使用工具搜索相关的最新新闻和市场动态\n\n你的职责包括：\n1. 使用工具搜索与目标股票相关的最新新闻事件\n2. 通过工具获取最新政策变化信息并评估对股票的影响\n3. 基于实时信息识别重大事件的市场影响程度\n4. 使用工具分析行业动态和竞争格局变化\n5. 提供基于最新信息面数据的投资判断\n\n分析要求：\n- 必须先使用工具获取时效性强的重要新闻\n- 区分短期事件影响和长期趋势\n- 根据股票代码判断相应市场的政策环境\n- 评估新闻的可信度和影响范围\n- 给出信息面的投资建议\n\n请务必使用工具获取最新新闻信息后再提供专业的新闻信息分析报告。\n\n\n输出格式要求：请将本次输出写成一篇完整的说明文，使用连续段落表述，不要使用标题符号（如##）、项目符号或编号，保持逻辑清晰、语言连贯。若需输出代码/伪代码，可使用代码块，不受上述限制。",
+      "user_prompt": "\n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的新闻信息分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "context": "当前日期时间: 2026年04月14日 15:30:49 (Tuesday)\n\n用户问题: 给我分析一下603106恒银科技这个股票\n\n公司基础信息: 抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+      "end_time": "2026-04-14T15:30:49.898859"
+    },
+    {
+      "agent_name": "fundamentals_analyst",
+      "action": "分析: \n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的基本面分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "start_time": "2026-04-14T15:30:49.720665",
+      "status": "failed",
+      "result": "LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '0e31f8f3-e0c2-9f5a-b5ac-40845412753e'}",
+      "system_prompt": "\n你是一位资深的基本面分析师，专门分析公司的财务状况和内在价值。\n\n重要工作原则：\n- 必须使用可用的外部工具获取最新的财务数据和公司信息\n- 不要依赖过时的历史知识，要基于当前最新财务数据分析\n- 在开始分析前，先使用工具获取相关公司的最新财务报表和指标\n请你获取公司最近两个完整财政年度（2025年和2026年）的最新财报数据，包括：\n  • 年度和季度收入报表\n  • 利润表和净利润数据\n  • 资产负债表\n  • 现金流量表\n  • 关键财务指标和比率\n如果2026年完整年报未发布，请获取最新可用的季度报告和2025年年报。\n\n你的职责包括：\n1. 使用工具获取公司的最新财务报表和关键财务指标\n2. 通过工具查询公司的盈利能力和成长性数据\n3. 使用工具获取估值数据进行分析（PE、PB、DCF等）\n4. 基于实时信息分析公司的竞争优势和护城河\n5. 提供基于最新基本面数据的投资建议\n\n分析要求：\n- 必须先使用工具获取最新的财务数据\n- 与同行业公司进行对比分析\n- 根据股票代码判断相应市场的估值特点\n- 评估公司的长期投资价值\n- 给出明确的基本面评级\n\n请务必使用工具获取最新财务数据后再提供专业的基本面分析报告。\n\n\n输出格式要求：请将本次输出写成一篇完整的说明文，使用连续段落表述，不要使用标题符号（如##）、项目符号或编号，保持逻辑清晰、语言连贯。若需输出代码/伪代码，可使用代码块，不受上述限制。",
+      "user_prompt": "\n请对用户问题 \"给我分析一下603106恒银科技这个股票\" 进行全面的基本面分析。\n\n当前时间：2026年04月14日 15:26:47 (Tuesday)\n\n\n",
+      "context": "当前日期时间: 2026年04月14日 15:30:49 (Tuesday)\n\n用户问题: 给我分析一下603106恒银科技这个股票\n\n公司基础信息: 抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+      "end_time": "2026-04-14T15:30:49.930215"
+    }
+  ],
+  "actions": [],
+  "mcp_calls": [],
+  "errors": [],
+  "warnings": [
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "bull_researcher",
+      "timestamp": "2026-04-14T15:30:49.936248"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "bear_researcher",
+      "timestamp": "2026-04-14T15:30:49.943238"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "research_manager",
+      "timestamp": "2026-04-14T15:30:49.949587"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "trader",
+      "timestamp": "2026-04-14T15:30:49.956532"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "aggressive_risk_analyst",
+      "timestamp": "2026-04-14T15:30:49.962502"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "safe_risk_analyst",
+      "timestamp": "2026-04-14T15:30:49.969771"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "neutral_risk_analyst",
+      "timestamp": "2026-04-14T15:30:49.976158"
+    },
+    {
+      "warning_msg": "智能体已禁用，本轮跳过",
+      "agent_name": "risk_manager",
+      "timestamp": "2026-04-14T15:30:49.983514"
+    }
+  ],
+  "final_results": {
+    "final_state": {
+      "user_query": "给我分析一下603106恒银科技这个股票",
+      "investment_debate_state": {
+        "count": 2,
+        "history": "",
+        "bull_history": "",
+        "bear_history": "",
+        "current_response": ""
+      },
+      "risk_debate_state": {
+        "count": 3,
+        "history": "",
+        "aggressive_history": "",
+        "safe_history": "",
+        "neutral_history": "",
+        "current_aggressive_response": "",
+        "current_safe_response": "",
+        "current_neutral_response": ""
+      },
+      "messages": [],
+      "market_report": "=== market_analyst 分析报告 ===\n时间: 20260414 15:30:49\n用户问题: 给我分析一下603106恒银科技这个股票\nMCP工具: 禁用\n\n抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'f993d908-adb8-9228-9a2e-3e9c3960fd86'}\n\n=== 报告结束 ===",
+      "sentiment_report": "=== sentiment_analyst 分析报告 ===\n时间: 20260414 15:30:49\n用户问题: 给我分析一下603106恒银科技这个股票\nMCP工具: 禁用\n\n抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '46b02eb7-360e-92c5-87f1-a710ed668054'}\n\n=== 报告结束 ===",
+      "news_report": "=== news_analyst 分析报告 ===\n时间: 20260414 15:30:49\n用户问题: 给我分析一下603106恒银科技这个股票\nMCP工具: 禁用\n\n抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '7ffc291a-e83f-954f-8c3c-4c49f5a5d127'}\n\n=== 报告结束 ===",
+      "fundamentals_report": "=== fundamentals_analyst 分析报告 ===\n时间: 20260414 15:30:49\n用户问题: 给我分析一下603106恒银科技这个股票\nMCP工具: 禁用\n\n抱歉，处理过程中出现错误: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '0e31f8f3-e0c2-9f5a-b5ac-40845412753e'}\n\n=== 报告结束 ===",
+      "shareholder_report": "",
+      "investment_plan": "",
+      "trader_investment_plan": "",
+      "final_trade_decision": "",
+      "errors": [
+        "company_overview_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+        "market_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'f993d908-adb8-9228-9a2e-3e9c3960fd86'}",
+        "company_overview_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+        "sentiment_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '46b02eb7-360e-92c5-87f1-a710ed668054'}",
+        "company_overview_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+        "news_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '7ffc291a-e83f-954f-8c3c-4c49f5a5d127'}",
+        "company_overview_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': 'd0b9cbe4-3f25-9db6-bebc-6ae44bb4d9d1'}",
+        "fundamentals_analyst: LLM调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided. For details, see: https://help.aliyun.com/zh/model-studio/error-code#apikey-error', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}, 'request_id': '0e31f8f3-e0c2-9f5a-b5ac-40845412753e'}"
+      ],
+      "warnings": [],
+      "agent_execution_history": [],
+      "mcp_tool_calls": []
+    },
+    "completion_time": "2026-04-14T15:30:50.238692",
+    "success": true
+  }
+}

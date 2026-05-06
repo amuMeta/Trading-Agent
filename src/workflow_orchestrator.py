@@ -637,6 +637,7 @@ class WorkflowOrchestrator:
         - 双方轮流发言，每方发言count+1
         - 每2次发言为1轮
         - 达到max_debate_rounds后进入研究经理
+        - 如果双方观点趋同（共识检测），提前结束辩论
 
         Args:
             state: 当前状态
@@ -657,6 +658,14 @@ class WorkflowOrchestrator:
             f"🤔 投资辩论: count={count}, round={current_round}, max={self.max_debate_rounds}"
         )
 
+        # 共识检测：如果双方观点已收敛，提前结束
+        if count >= 2:  # 至少各发言一次后开始检测
+            bull_history = investment_debate_state.get("bull_history", "")
+            bear_history = investment_debate_state.get("bear_history", "")
+            if self._check_investment_consensus(bull_history, bear_history):
+                print("📊 共识检测：双方观点已收敛，提前结束辩论")
+                return "research_manager"
+
         if current_round <= self.max_debate_rounds:
             if count % 2 == 1:  # 奇数次，看跌研究员
                 return "bear_researcher"
@@ -664,6 +673,51 @@ class WorkflowOrchestrator:
                 return "bull_researcher"
         else:
             return "research_manager"
+
+    def _check_investment_consensus(self, bull_text: str, bear_text: str) -> bool:
+        """
+        检测看涨和看跌观点是否已达成共识
+
+        使用关键词重叠度检测：
+        - 提取双方论证中的关键结论词
+        - 计算重叠比例，超过阈值则认为共识
+
+        Args:
+            bull_text: 看涨方论证
+            bear_text: 看跌方论证
+
+        Returns:
+            bool: 是否达成共识
+        """
+        if not bull_text or not bear_text:
+            return False
+
+        # 共识关键词：双方都提到的关键判断
+        consensus_signals = [
+            "持有", "观望", "等待", "谨慎", "不确定性",
+            "长期", "价值", "基本面", "核心", "质地",
+            "风险", "收益", "配置", "仓位", "时机"
+        ]
+
+        # 提取双方论证中的共识关键词
+        bull_signals = [s for s in consensus_signals if s in bull_text]
+        bear_signals = [s for s in consensus_signals if s in bear_text]
+
+        if not bull_signals or not bear_signals:
+            return False
+
+        # 计算交集
+        common_signals = set(bull_signals) & set(bear_signals)
+
+        # 如果超过40%的关键词重叠，认为共识
+        min_count = min(len(bull_signals), len(bear_signals))
+        if min_count == 0:
+            return False
+
+        overlap_ratio = len(common_signals) / min_count
+        print(f"📊 共识检测: overlap_ratio={overlap_ratio:.2f}, common_signals={common_signals}")
+
+        return overlap_ratio > 0.4
 
     def _should_continue_risk_debate(self, state) -> str:
         """
@@ -673,6 +727,7 @@ class WorkflowOrchestrator:
         - 三方轮流发言：激进 → 保守 → 中性 → 激进...
         - 每3次发言为1轮
         - 达到max_risk_debate_rounds后进入风险经理
+        - 如果三方观点趋同，提前结束
 
         Args:
             state: 当前状态
@@ -693,6 +748,15 @@ class WorkflowOrchestrator:
             f"🤔 风险辩论: count={count}, round={current_round}, max={self.max_risk_debate_rounds}"
         )
 
+        # 共识检测：如果三方观点已收敛，提前结束
+        if count >= 3:  # 至少各发言一次后开始检测
+            aggressive = risk_debate_state.get("aggressive_history", "")
+            safe = risk_debate_state.get("safe_history", "")
+            neutral = risk_debate_state.get("neutral_history", "")
+            if self._check_risk_consensus(aggressive, safe, neutral):
+                print("📊 风险共识检测：三方观点已收敛，提前结束辩论")
+                return "risk_manager"
+
         if current_round <= self.max_risk_debate_rounds:
             remainder = count % 3
             if remainder == 1:
@@ -703,6 +767,53 @@ class WorkflowOrchestrator:
                 return "aggressive_risk_analyst"
         else:
             return "risk_manager"
+
+    def _check_risk_consensus(
+        self, aggressive: str, safe: str, neutral: str
+    ) -> bool:
+        """
+        检测三方风险观点是否已达成共识
+
+        当激进和保守两方的最终建议趋于一致时（如都建议止损），
+        认为风险辩论已达成共识。
+
+        Args:
+            aggressive: 激进方论证
+            safe: 保守方论证
+            neutral: 中性方论证
+
+        Returns:
+            bool: 是否达成共识
+        """
+        if not aggressive or not safe or not neutral:
+            return False
+
+        # 风险共识信号：止损、仓位控制等核心建议
+        risk_consensus_signals = [
+            "止损", "仓位", "控制", "风险", "配置",
+            "分批", "阶梯", "逐步", " Monitor", "观察",
+            "等待", "信号", "确认", "谨慎"
+        ]
+
+        # 检查是否有足够的共识关键词
+        agg_signals = [s for s in risk_consensus_signals if s in aggressive]
+        safe_signals = [s for s in risk_consensus_signals if s in safe]
+        neutral_signals = [s for s in risk_consensus_signals if s in neutral]
+
+        if not agg_signals or not safe_signals or not neutral_signals:
+            return False
+
+        # 计算三方共识程度：激进和保守至少50%关键词重叠
+        common_agg_safe = set(agg_signals) & set(safe_signals)
+        min_count = min(len(agg_signals), len(safe_signals))
+
+        if min_count == 0:
+            return False
+
+        overlap_ratio = len(common_agg_safe) / min_count
+        print(f"📊 风险共识检测: overlap_ratio={overlap_ratio:.2f}")
+
+        return overlap_ratio > 0.5
 
     # =========================================================================
     # 取消机制

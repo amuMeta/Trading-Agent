@@ -1,33 +1,38 @@
-# Dependencies
-node_modules/
+# External dependencies
+external/stock-mcp-main/
+
+# Session data (large)
+storage/sessions/*.json
+storage/cache/
+
+# ChromaDB
+data/chroma_db/
+
+# Python
 __pycache__/
-*.pyc
-
-# Environment files (keep .env.example)
-.env
-
-# Logs
-*.log
-api.log
-
-# OS files
-.DS_Store
-Thumbs.db
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Build outputs
-frontend/.next/
-frontend/out/
-build/
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node (for frontend)
+node_modules/
+.next/
 dist/
-
-# Temporary files
-*.tmp
-*.temp
-nul
-
-# Dump files (session data)
-src/dump/
+build/

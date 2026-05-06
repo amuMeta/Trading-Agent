@@ -66,7 +66,7 @@ class MCPManager:
 
         # HTTP客户端（用于直接调用stock-mcp API，作为MCP的备用方案）
         try:
-            from src.tools.http_client import StockMCPHTTPClient
+            from src.mcp.http_client import StockMCPHTTPClient
 
             self.http_client = StockMCPHTTPClient()
             print("✅ HTTP客户端初始化成功")

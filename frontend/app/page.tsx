@@ -43,23 +43,33 @@ export default function HomePage() {
 
   // 加载K线数据
   const loadKlineData = async (stockCode: string) => {
+    console.log('[HomePage] 开始加载K线数据:', stockCode);
     try {
       const [klineRes, indRes, priceRes] = await Promise.all([
         Api.getStockKline(stockCode, "30d"),
         Api.getStockIndicators(stockCode),
         Api.getStockPrice(stockCode)
       ]);
+      console.log('[HomePage] K线响应:', klineRes);
+      // 后端返回格式: { data: { data: [...] } }
       if (klineRes?.data?.data) {
+        console.log('[HomePage] 设置K线数据，共', klineRes.data.data.length, '条');
         setKlineData(klineRes.data.data);
+      } else {
+        console.warn('[HomePage] K线数据格式异常:', klineRes);
+        setKlineData([]);
       }
       if (indRes?.indicators) {
+        console.log('[HomePage] 设置技术指标');
         setIndicators(indRes.indicators);
       }
       if (priceRes?.price) {
+        console.log('[HomePage] 设置实时价格');
         setRealTimePrice(priceRes.price[0]);
       }
     } catch (e) {
-      console.error("加载K线失败:", e);
+      console.error('[HomePage] 加载K线失败:', e);
+      setKlineData([]);
     }
   };
 
@@ -123,17 +133,9 @@ export default function HomePage() {
     [selected]
   );
 
-  // 转换K线数据为图表格式
+  // 转换K线数据为图表格式 - 直接传递原始数据，让PriceChart处理字段映射
   const chartData = useMemo(() => {
-    if (!klineData.length) return [];
-    return klineData.map((item: any) => ({
-      time: item.date?.slice(5) || item.time || "",
-      price: item.close || item.price || 0,
-      volume: item.volume || 0,
-      open: item.open || 0,
-      high: item.high || 0,
-      low: item.low || 0
-    }));
+    return klineData;
   }, [klineData]);
 
   if (!ready) return (
@@ -170,7 +172,15 @@ export default function HomePage() {
             {/* 查询输入 */}
             <QueryInput
               value={query}
-              onChange={setQuery}
+              onChange={(val) => {
+                setQuery(val);
+                // 自动加载K线数据
+                const code = val.match(/(\d{6})/)?.[1];
+                if (code) {
+                  console.log('[HomePage] 检测到股票代码:', code);
+                  loadKlineData(code);
+                }
+              }}
               running={running}
               onStart={async () => {
                 const code = query.match(/(\d{6})/)?.[1];
@@ -199,6 +209,7 @@ export default function HomePage() {
               onLoadKline={() => {
                 const code = query.match(/(\d{6})/)?.[1];
                 if (code) {
+                  console.log('[HomePage] 手动加载K线:', code);
                   loadKlineData(code);
                 }
               }}

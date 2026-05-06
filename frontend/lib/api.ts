@@ -25,6 +25,40 @@ export type TaskSummary = {
   mtime: number;
 };
 
+export type DBSessionRecord = {
+  session_id: string;
+  user_query: string;
+  stock_code: string;
+  status: string;
+  created_at: string;
+  completed_at: string;
+  duration_seconds: number;
+  agents_count: number;
+  mcp_calls_count: number;
+  mcp_success_rate: number;
+  error_count: number;
+  quality_score: number;
+};
+
+export type DBStatistics = {
+  total_sessions: number;
+  completed_sessions: number;
+  avg_duration_seconds: number;
+  avg_mcp_success_rate: number;
+  avg_quality_score: number;
+  agent_statistics: Array<{
+    agent_name: string;
+    call_count: number;
+    avg_duration: number;
+    total_mcp_calls: number;
+  }>;
+  tool_statistics: Array<{
+    tool_name: string;
+    call_count: number;
+    successful_calls: number;
+  }>;
+};
+
 export const Api = {
   getCapabilities: () => api.get("/api/system/capabilities").then((r) => r.data),
   getHealth: () => api.get("/api/system/health").then((r) => r.data),
@@ -62,6 +96,27 @@ export const Api = {
     format: "md" | "pdf" | "docx",
     payload: { session_id: string; key_agents_only?: boolean }
   ) =>
-    api.post(`/api/exports/${format}`, payload, { responseType: "blob" }).then((r) => r)
+    api.post(`/api/exports/${format}`, payload, { responseType: "blob" }).then((r) => r),
+  evaluateSession: (sessionId: string) =>
+    api.get(`/api/analysis/${sessionId}/evaluate`).then((r) => r.data),
+  compareSessions: (sessionIds: string[], metricsType?: string) =>
+    api.get("/api/analysis/compare", {
+      params: { session_ids: sessionIds.join(","), metrics_type: metricsType }
+    }).then((r) => r.data),
+  searchDBSessions: (params: {
+    stock_code?: string;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    min_quality_score?: number;
+    limit?: number;
+    offset?: number;
+  }) => api.post("/api/db/sessions/search", null, { params }).then((r) => r.data),
+  getDBSession: (sessionId: string) =>
+    api.get(`/api/db/sessions/${sessionId}`).then((r) => r.data),
+  getDBStatistics: () => api.get("/api/db/statistics").then((r) => r.data),
+  importSessionToDB: (sessionId: string) =>
+    api.post(`/api/db/sessions/${sessionId}/import`).then((r) => r.data),
+  importAllSessionsToDB: () => api.post("/api/db/import-all").then((r) => r.data)
 };
 

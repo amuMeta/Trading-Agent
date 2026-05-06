@@ -31,7 +31,154 @@ from .agent_states import AgentState
 from .mcp_manager import MCPManager
 
 
-class BaseAgent(ABC):
+def _check_http_result_valid(result: Dict) -> bool:
+    """
+    检查HTTP结果是否有效
+
+    Args:
+        result: HTTP响应结果
+
+    Returns:
+        bool: 结果是否有效（非空、无错误）
+    """
+    if not isinstance(result, dict):
+        return False
+    if "error" in result and result["error"]:
+        return False
+    if "code" in result and result.get("code") != 0:
+        return False
+    if "data" in result:
+        data = result["data"]
+        if isinstance(data, dict) and "error" in data:
+            return False
+        if isinstance(data, dict) and not data:
+            return False
+        if data is None:
+            return False
+    return True
+
+
+class RAGKnowledgeMixin:
+    """
+    RAG知识检索混入类
+
+    提供知识检索功能，让智能体能够：
+    1. 根据用户查询检索相关专业知识
+    2. 将检索结果注入到提示词中
+    3. 减少LLM幻觉，增强回答准确性
+    """
+
+    def __init__(self):
+        self._rag_engine = None
+        self._rag_enabled = True
+
+    def _get_rag_engine(self):
+        """获取或初始化RAG引擎"""
+        if self._rag_engine is None:
+            try:
+                from src.rag.engine import get_rag_engine
+                self._rag_engine = get_rag_engine()
+            except Exception as e:
+                print(f"[RAG] 引擎初始化失败: {e}")
+                self._rag_enabled = False
+                self._rag_engine = None
+        return self._rag_engine
+
+    def _extract_stock_code(self, text: str) -> str:
+        """从文本中提取股票代码"""
+        import re
+        patterns = [r"(\d{6})", r"(SSE:\d{6})", r"(SZSE:\d{6})", r"([A-Za-z]+)"]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1)
+        return ""
+
+    def _retrieve_knowledge(
+        self, query: str, top_k: int = 3, collection: str = "finance_knowledge"
+    ) -> str:
+        """
+        检索相关知识
+
+        Args:
+            query: 查询文本
+            top_k: 返回数量
+            collection: 集合名称
+
+        Returns:
+            str: 格式化后的知识上下文
+        """
+        if not self._rag_enabled:
+            return ""
+
+        try:
+            engine = self._get_rag_engine()
+            if engine is None:
+                return ""
+
+            results = engine.search(query, top_k=top_k, collection_name=collection)
+
+            if not results:
+                return ""
+
+            knowledge_parts = []
+            for i, r in enumerate(results, 1):
+                content = r.get("content", "")
+                score = r.get("score", 0)
+                if content:
+                    knowledge_parts.append(f"【参考知识{i}】{content}")
+
+            return "\n\n".join(knowledge_parts)
+
+        except Exception as e:
+            print(f"[RAG] 知识检索失败: {e}")
+            return ""
+
+    def _build_rag_context(self, state: AgentState, user_message: str) -> str:
+        """
+        构建RAG知识上下文
+
+        根据智能体类型和用户查询，检索相关的专业知识。
+        知识来源：
+        - finance_knowledge: 金融通用知识（股票规则、交易知识等）
+        - user_knowledge: 用户上传的知识文档
+
+        Args:
+            state: 当前状态
+            user_message: 用户消息
+
+        Returns:
+            str: 知识上下文字符串
+        """
+        knowledge_contexts = []
+
+        user_query = (
+            state.get("user_query", "")
+            if isinstance(state, dict)
+            else getattr(state, "user_query", "")
+        )
+
+        stock_code = self._extract_stock_code(user_query or user_message)
+        agent_type = getattr(self, "agent_name", "")
+
+        base_query = f"{user_query} {stock_code}".strip()
+
+        finance_knowledge = self._retrieve_knowledge(
+            base_query, top_k=3, collection="finance_knowledge"
+        )
+        if finance_knowledge:
+            knowledge_contexts.append(f"【金融知识库】\n{finance_knowledge}")
+
+        user_knowledge = self._retrieve_knowledge(
+            base_query, top_k=2, collection="user_knowledge"
+        )
+        if user_knowledge:
+            knowledge_contexts.append(f"【用户知识库】\n{user_knowledge}")
+
+        return "\n\n".join(knowledge_contexts) if knowledge_contexts else ""
+
+
+class BaseAgent(ABC, RAGKnowledgeMixin):
     """
     基础智能体类
     
@@ -323,7 +470,11 @@ class BaseAgent(ABC):
                 context_prompt = self.build_analyst_context_prompt(state)
             else:
                 context_prompt = self.build_context_prompt(state)
-            
+
+            rag_context = self._build_rag_context(state, user_message)
+            if rag_context:
+                context_prompt = f"{context_prompt}\n\n{rag_context}"
+
             system_level_prompt = f"""{system_prompt}
 
 {context_prompt}"""
