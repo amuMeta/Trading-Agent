@@ -756,8 +756,13 @@ async def sessions(status: Optional[str] = None):
         data = read_json(sf)
         if data is None:
             continue
-        if status and (data.get("status") or "").lower() != status.lower():
-            continue
+        file_status = (data.get("status") or "").lower()
+        if status:
+            if status.lower() == "completed":
+                if file_status not in ("completed", "active"):
+                    continue
+            elif file_status != status.lower():
+                continue
         items.append(
             {
                 "session_id": data.get("session_id"),
@@ -1568,3 +1573,183 @@ async def list_cached_analyses(
             limit=limit
         )
     }
+
+
+# ========================================
+# 聊天历史管理API
+# ========================================
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+
+@dataclass
+class ChatMessageDTO:
+    message_id: int
+    role: str
+    content: str
+    sources: Optional[List[Dict]]
+    created_at: str
+
+
+@dataclass
+class ChatConversationDTO:
+    conversation_id: str
+    title: str
+    preview: str
+    created_at: str
+    updated_at: str
+    message_count: int
+
+
+class ChatMessageRequest(BaseModel):
+    role: str
+    content: str
+    sources: Optional[List[Dict]] = None
+    user_id: str = "default_user"
+
+
+class CreateConversationRequest(BaseModel):
+    user_id: str = "default_user"
+    title: str = "新对话"
+
+
+@app.get("/api/chat/conversations")
+async def get_chat_conversations(
+    user_id: str = "default_user",
+    limit: int = 50,
+    offset: int = 0
+):
+    """获取用户的聊天会话列表"""
+    try:
+        db = get_session_db()
+        conversations = db.get_chat_conversations(user_id, limit, offset)
+        return {
+            "conversations": [
+                {
+                    "id": c.conversation_id,
+                    "title": c.title,
+                    "preview": c.preview,
+                    "createdAt": c.created_at,
+                    "updatedAt": c.updated_at,
+                    "messageCount": c.message_count
+                }
+                for c in conversations
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/chat/conversations/{conversation_id}")
+async def get_chat_conversation(conversation_id: str, user_id: str = "default_user"):
+    """获取聊天会话详情（含消息）"""
+    try:
+        db = get_session_db()
+
+        conversation = db.get_chat_conversation(conversation_id, user_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+        messages = db.get_chat_messages(conversation_id)
+
+        return {
+            "conversation": {
+                "id": conversation.conversation_id,
+                "title": conversation.title,
+                "preview": conversation.preview,
+                "createdAt": conversation.created_at,
+                "updatedAt": conversation.updated_at,
+                "messageCount": conversation.message_count
+            },
+            "messages": [
+                {
+                    "id": str(m.message_id),
+                    "role": m.role,
+                    "content": m.content,
+                    "sources": json.loads(m.sources) if m.sources else [],
+                    "timestamp": m.created_at
+                }
+                for m in messages
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/chat/conversations")
+async def create_chat_conversation(request: CreateConversationRequest):
+    """创建新的聊天会话"""
+    try:
+        import uuid
+        conversation_id = uuid.uuid4().hex[:16]
+
+        db = get_session_db()
+        success = db.create_chat_conversation(conversation_id, request.user_id, request.title)
+
+        if success:
+            return {
+                "id": conversation_id,
+                "title": request.title,
+                "preview": "",
+                "createdAt": datetime.now().isoformat(),
+                "updatedAt": datetime.now().isoformat(),
+                "messageCount": 0
+            }
+        else:
+            raise HTTPException(status_code=500, detail="创建会话失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/chat/conversations/{conversation_id}")
+async def delete_chat_conversation(conversation_id: str, user_id: str = "default_user"):
+    """删除聊天会话"""
+    try:
+        db = get_session_db()
+        success = db.delete_chat_conversation(conversation_id, user_id)
+        return {"status": "success" if success else "failed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/chat/conversations/{conversation_id}/messages")
+async def add_chat_message(
+    conversation_id: str,
+    request: ChatMessageRequest
+):
+    """添加聊天消息"""
+    try:
+        db = get_session_db()
+
+        conversation = db.get_chat_conversation(conversation_id, request.user_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+        message_id = db.add_chat_message(conversation_id, request.role, request.content, request.sources)
+
+        if message_id:
+            db.update_chat_conversation(conversation_id, request.user_id, preview=request.content[:50] if len(request.content) > 50 else request.content)
+            return {
+                "messageId": message_id,
+                "status": "success"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="保存消息失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/chat/messages/{message_id}")
+async def delete_chat_message(message_id: int):
+    """删除聊天消息"""
+    try:
+        db = get_session_db()
+        success = db.delete_chat_message(message_id)
+        return {"status": "success" if success else "failed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

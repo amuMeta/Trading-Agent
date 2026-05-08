@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface Message {
@@ -46,15 +46,6 @@ function loadConversations(): Conversation[] {
   }
 }
 
-function saveConversations(conversations: Conversation[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
-  } catch (e) {
-    console.error("保存对话失败:", e);
-  }
-}
-
 export default function ChatPage() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -65,7 +56,53 @@ export default function ChatPage() {
   const [showHistory, setShowHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 加载历史对话
+  // Refs for performance optimization
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sseAccumRef = useRef<{ content: string; sources: Source[] }>({ content: "", sources: [] });
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+  const conversationsRef = useRef<Conversation[]>([]);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  // Debounced save to localStorage (500ms delay)
+  const debouncedSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      const currentMessages = messagesRef.current;
+      const currentConvs = conversationsRef.current;
+      const currentConvId = conversationsRef.current.find(c => c.id === currentConversationId)?.id;
+
+      if (currentConvId && currentMessages.length > 0) {
+        const updated = currentConvs.map((conv) =>
+          conv.id === currentConvId
+            ? {
+                ...conv,
+                messages: currentMessages,
+                preview: currentMessages[currentMessages.length - 1]?.content?.slice(0, 50) || "",
+                updatedAt: Date.now(),
+              }
+            : conv
+        );
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error("保存对话失败:", e);
+        }
+      }
+    }, 500);
+  }, [currentConversationId]);
+
+  // Load history on mount
   useEffect(() => {
     const loaded = loadConversations();
     setConversations(loaded);
@@ -73,25 +110,20 @@ export default function ChatPage() {
       setCurrentConversationId(loaded[0].id);
       setMessages(loaded[0].messages);
     }
-  }, []);
 
-  // 保存对话到localStorage
-  useEffect(() => {
-    if (currentConversationId && messages.length > 0) {
-      const updated = conversations.map((conv) =>
-        conv.id === currentConversationId
-          ? {
-              ...conv,
-              messages,
-              preview: messages[messages.length - 1]?.content?.slice(0, 50) || "",
-              updatedAt: Date.now(),
-            }
-          : conv
-      );
-      setConversations(updated);
-      saveConversations(updated);
-    }
-  }, [messages, currentConversationId, conversations]);
+    // RAG Engine preheat - warm up on page load
+    fetch("/api/chat/rag/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "hello",
+        history: [],
+        top_k: 1,
+        collection: "finance_knowledge"
+      }),
+    }).catch(() => {}); // Ignore errors, just warm up
+
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,26 +133,28 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // 开始新对话
-  const startNewConversation = () => {
-    // 保存当前对话
+  // Start new conversation
+  const startNewConversation = async () => {
+    // Save current conversation (triggers debounced save)
     if (currentConversationId && messages.length > 0) {
-      const updated = conversations.map((conv) =>
-        conv.id === currentConversationId
-          ? {
-              ...conv,
-              messages,
-              preview: messages[messages.length - 1]?.content?.slice(0, 50) || "",
-              updatedAt: Date.now(),
-            }
-          : conv
-      );
-      saveConversations(updated);
+      debouncedSave();
     }
 
-    // 创建新对话
+    const newConvId = generateId();
+
+    // Create conversation on server (fire and forget)
+    fetch("/api/chat/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: "default_user",
+        title: `新对话 ${conversations.length + 1}`
+      }),
+    }).catch(() => {});
+
+    // Create new conversation
     const newConversation: Conversation = {
-      id: generateId(),
+      id: newConvId,
       title: `新对话 ${conversations.length + 1}`,
       preview: "",
       messages: [],
@@ -132,29 +166,17 @@ export default function ChatPage() {
     setConversations(newConversations);
     setCurrentConversationId(newConversation.id);
     setMessages([]);
-    saveConversations(newConversations);
     setShowHistory(false);
   };
 
-  // 加载历史对话
+  // Load conversation
   const loadConversation = (convId: string) => {
-    // 保存当前对话
+    // Save current conversation (triggers debounced save)
     if (currentConversationId && messages.length > 0) {
-      const updated = conversations.map((conv) =>
-        conv.id === currentConversationId
-          ? {
-              ...conv,
-              messages,
-              preview: messages[messages.length - 1]?.content?.slice(0, 50) || "",
-              updatedAt: Date.now(),
-            }
-          : conv
-      );
-      setConversations(updated);
-      saveConversations(updated);
+      debouncedSave();
     }
 
-    // 加载选中的对话
+    // Load selected conversation
     const conv = conversations.find((c) => c.id === convId);
     if (conv) {
       setCurrentConversationId(conv.id);
@@ -163,12 +185,17 @@ export default function ChatPage() {
     }
   };
 
-  // 删除对话
-  const deleteConversation = (convId: string, e: React.MouseEvent) => {
+  // Delete conversation
+  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Delete from server (fire and forget)
+    fetch(`/api/chat/conversations/${convId}?user_id=default_user`, {
+      method: "DELETE"
+    }).catch(() => {});
+
     const updated = conversations.filter((c) => c.id !== convId);
     setConversations(updated);
-    saveConversations(updated);
 
     if (currentConversationId === convId) {
       if (updated.length > 0) {
@@ -193,6 +220,9 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+
+    // Trigger debounced save
+    debouncedSave();
 
     try {
       const history = messages.slice(-10).map((m) => ({
@@ -260,6 +290,34 @@ export default function ChatPage() {
           }
         }
       }
+
+      // Trigger debounced save after conversation ends
+      debouncedSave();
+
+      // Save to server (fire and forget, don't wait)
+      if (currentConversationId) {
+        fetch(`/api/chat/conversations/${currentConversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: userMessage.role,
+            content: userMessage.content,
+            sources: [],
+            user_id: "default_user"
+          }),
+        }).catch(() => {});
+
+        fetch(`/api/chat/conversations/${currentConversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: assistantMessage.role,
+            content: assistantMessage.content,
+            sources: assistantMessage.sources || [],
+            user_id: "default_user"
+          }),
+        }).catch(() => {});
+      }
     } catch (error) {
       console.error("对话错误:", error);
       setMessages((prev) => [
@@ -273,6 +331,7 @@ export default function ChatPage() {
       ]);
     } finally {
       setIsLoading(false);
+      debouncedSave();
     }
   };
 

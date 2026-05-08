@@ -42,6 +42,28 @@ class SessionRecord:
     quality_score: float
 
 
+@dataclass
+class ChatMessageRecord:
+    """聊天消息记录"""
+    message_id: int
+    conversation_id: str
+    role: str
+    content: str
+    sources: Optional[str]
+    created_at: str
+
+
+@dataclass
+class ChatConversationRecord:
+    """聊天会话记录"""
+    conversation_id: str
+    title: str
+    preview: str
+    created_at: str
+    updated_at: str
+    message_count: int
+
+
 class SessionDatabase:
     """SQLite会话数据库"""
 
@@ -111,12 +133,39 @@ class SessionDatabase:
                 )
             """)
 
+            # 聊天会话表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_conversations (
+                    conversation_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    title TEXT,
+                    preview TEXT,
+                    created_at TEXT,
+                    updated_at TEXT
+                )
+            """)
+
+            # 聊天消息表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    sources TEXT,
+                    created_at TEXT,
+                    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(conversation_id)
+                )
+            """)
+
             # 创建索引
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_stock ON sessions(stock_code)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_executions_session ON agent_executions(session_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mcp_calls_session ON mcp_calls(session_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_conversations_updated ON chat_conversations(updated_at)")
 
             conn.commit()
             print(f"✅ 数据库初始化完成: {self.db_path}")
@@ -524,3 +573,202 @@ class SessionDatabase:
             depth_score = 0
 
         return round(completeness_score + depth_score, 2)
+
+    # ========================================
+    # 聊天会话管理方法
+    # ========================================
+
+    def create_chat_conversation(
+        self,
+        conversation_id: str,
+        user_id: str,
+        title: str = "新对话"
+    ) -> bool:
+        """创建聊天会话"""
+        try:
+            now = datetime.now().isoformat()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_conversations
+                    (conversation_id, user_id, title, preview, created_at, updated_at)
+                    VALUES (?, ?, ?, '', ?, ?)
+                """, (conversation_id, user_id, title, now, now))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"❌ 创建聊天会话失败: {e}")
+            return False
+
+    def get_chat_conversations(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[ChatConversationRecord]:
+        """获取用户的聊天会话列表"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT c.conversation_id, c.title, c.preview, c.created_at, c.updated_at,
+                           COUNT(m.message_id) as message_count
+                    FROM chat_conversations c
+                    LEFT JOIN chat_messages m ON c.conversation_id = m.conversation_id
+                    WHERE c.user_id = ?
+                    GROUP BY c.conversation_id
+                    ORDER BY c.updated_at DESC
+                    LIMIT ? OFFSET ?
+                """, (user_id, limit, offset))
+                rows = cursor.fetchall()
+                return [ChatConversationRecord(
+                    conversation_id=row["conversation_id"],
+                    title=row["title"],
+                    preview=row["preview"] or "",
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    message_count=row["message_count"]
+                ) for row in rows]
+        except Exception as e:
+            print(f"❌ 获取聊天会话列表失败: {e}")
+            return []
+
+    def get_chat_conversation(self, conversation_id: str, user_id: str) -> Optional[ChatConversationRecord]:
+        """获取单个聊天会话"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT c.conversation_id, c.title, c.preview, c.created_at, c.updated_at,
+                           COUNT(m.message_id) as message_count
+                    FROM chat_conversations c
+                    LEFT JOIN chat_messages m ON c.conversation_id = m.conversation_id
+                    WHERE c.conversation_id = ? AND c.user_id = ?
+                    GROUP BY c.conversation_id
+                """, (conversation_id, user_id))
+                row = cursor.fetchone()
+                if row:
+                    return ChatConversationRecord(
+                        conversation_id=row["conversation_id"],
+                        title=row["title"],
+                        preview=row["preview"] or "",
+                        created_at=row["created_at"],
+                        updated_at=row["updated_at"],
+                        message_count=row["message_count"]
+                    )
+                return None
+        except Exception as e:
+            print(f"❌ 获取聊天会话失败: {e}")
+            return None
+
+    def delete_chat_conversation(self, conversation_id: str, user_id: str) -> bool:
+        """删除聊天会话及其所有消息"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM chat_messages WHERE conversation_id = ?",
+                    (conversation_id,)
+                )
+                cursor.execute(
+                    "DELETE FROM chat_conversations WHERE conversation_id = ? AND user_id = ?",
+                    (conversation_id, user_id)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"❌ 删除聊天会话失败: {e}")
+            return False
+
+    def update_chat_conversation(self, conversation_id: str, user_id: str, title: str = None, preview: str = None) -> bool:
+        """更新聊天会话"""
+        try:
+            updates = []
+            params = []
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title)
+            if preview is not None:
+                updates.append("preview = ?")
+                params.append(preview)
+            updates.append("updated_at = ?")
+            params.append(datetime.now().isoformat())
+            params.extend([conversation_id, user_id])
+
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"UPDATE chat_conversations SET {', '.join(updates)} WHERE conversation_id = ? AND user_id = ?",
+                    params
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ 更新聊天会话失败: {e}")
+            return False
+
+    def add_chat_message(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
+        sources: Optional[List[Dict]] = None
+    ) -> Optional[int]:
+        """添加聊天消息"""
+        try:
+            now = datetime.now().isoformat()
+            sources_json = json.dumps(sources, ensure_ascii=False) if sources else None
+
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_messages (conversation_id, role, content, sources, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (conversation_id, role, content, sources_json, now))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"❌ 添加聊天消息失败: {e}")
+            return None
+
+    def get_chat_messages(
+        self,
+        conversation_id: str,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[ChatMessageRecord]:
+        """获取聊天消息列表"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT message_id, conversation_id, role, content, sources, created_at
+                    FROM chat_messages
+                    WHERE conversation_id = ?
+                    ORDER BY created_at ASC
+                    LIMIT ? OFFSET ?
+                """, (conversation_id, limit, offset))
+                rows = cursor.fetchall()
+                return [ChatMessageRecord(
+                    message_id=row["message_id"],
+                    conversation_id=row["conversation_id"],
+                    role=row["role"],
+                    content=row["content"],
+                    sources=row["sources"],
+                    created_at=row["created_at"]
+                ) for row in rows]
+        except Exception as e:
+            print(f"❌ 获取聊天消息失败: {e}")
+            return []
+
+    def delete_chat_message(self, message_id: int) -> bool:
+        """删除聊天消息"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chat_messages WHERE message_id = ?", (message_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ 删除聊天消息失败: {e}")
+            return False

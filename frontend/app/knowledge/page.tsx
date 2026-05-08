@@ -37,6 +37,12 @@ export default function KnowledgePage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
+  // 新增：所有集合列表
+  const [allCollections, setAllCollections] = useState<Array<{name: string; count: number}>>([]);
+  // 新增：快速搜索
+  const [quickSearch, setQuickSearch] = useState("");
+  const [quickSearchResults, setQuickSearchResults] = useState<RecallResult[]>([]);
+
   // 召回测试相关
   const [query, setQuery] = useState("");
   const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
@@ -44,8 +50,20 @@ export default function KnowledgePage() {
   const [tested, setTested] = useState(false);
 
   useEffect(() => {
-    fetchKbInfo();
+    fetchAllCollections();
   }, []);
+
+  const fetchAllCollections = async () => {
+    try {
+      const res = await fetch("/api/rag/collections");
+      if (res.ok) {
+        const data = await res.json();
+        setAllCollections(data.collections || []);
+      }
+    } catch (error) {
+      console.error("获取集合列表失败:", error);
+    }
+  };
 
   const fetchKbInfo = async () => {
     setLoading(true);
@@ -59,6 +77,29 @@ export default function KnowledgePage() {
       console.error("获取知识库信息失败:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickSearch = async () => {
+    if (!quickSearch.trim() || !collectionName) return;
+
+    try {
+      const res = await fetch("/api/rag/knowledge/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: quickSearch,
+          top_k: 5,
+          collection: collectionName,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setQuickSearchResults(data.results || []);
+      }
+    } catch (error) {
+      console.error("快速搜索失败:", error);
     }
   };
 
@@ -87,6 +128,7 @@ export default function KnowledgePage() {
         setUploadResult(data);
         setUploadProgress(100);
         fetchKbInfo();
+        fetchAllCollections();
       } else {
         const error = await res.json();
         setUploadResult({ status: "error", error: error.detail || "上传失败" });
@@ -110,6 +152,7 @@ export default function KnowledgePage() {
       if (res.ok) {
         alert("知识库已清空");
         fetchKbInfo();
+        fetchAllCollections();
       }
     } catch (error) {
       console.error("删除失败:", error);
@@ -285,8 +328,8 @@ export default function KnowledgePage() {
                               #{index + 1}
                             </span>
                             <span className="text-sm font-medium text-gray-700">
-                              {result.metadata?.filename
-                                ? result.metadata.filename.toString()
+                              {typeof result.metadata?.filename === 'string'
+                                ? result.metadata.filename
                                 : "未知来源"}
                             </span>
                           </div>
@@ -316,14 +359,14 @@ export default function KnowledgePage() {
 
                         {result.metadata && Object.keys(result.metadata).length > 0 && (
                           <div className="text-xs text-gray-400">
-                            {result.metadata.file_extension && (
+                            {typeof result.metadata?.file_extension === 'string' && (
                               <span className="mr-3">
-                                类型: {result.metadata.file_extension.toString()}
+                                类型: {result.metadata.file_extension}
                               </span>
                             )}
-                            {result.metadata.file_size_mb && (
+                            {typeof result.metadata?.file_size_mb === 'number' && (
                               <span>
-                                大小: {result.metadata.file_size_mb.toString()} MB
+                                大小: {result.metadata.file_size_mb} MB
                               </span>
                             )}
                           </div>
@@ -436,23 +479,140 @@ export default function KnowledgePage() {
 
         {activeTab === "manage" && (
           <div className="space-y-6">
-            {/* 知识库概览 */}
+            {/* 知识库概览 - 全部集合 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-800">📊 知识库概览</h2>
+                <button
+                  onClick={fetchKbInfo}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors flex items-center gap-1"
+                >
+                  <span>🔄</span> 刷新
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">加载中...</div>
+              ) : allCollections.length > 0 ? (
+                <div className="space-y-4">
+                  {/* 统计卡片 */}
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">{allCollections.length}</div>
+                      <div className="text-sm text-blue-600 mt-1">集合数量</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {allCollections.reduce((sum, c) => sum + c.count, 0)}
+                      </div>
+                      <div className="text-sm text-green-600 mt-1">文档片段总数</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {allCollections.filter(c => c.count > 0).length}
+                      </div>
+                      <div className="text-sm text-purple-600 mt-1">有数据的集合</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {allCollections.reduce((sum, c) => sum + c.count, 0) > 0 ? "✅" : "❌"}
+                      </div>
+                      <div className="text-sm text-orange-600 mt-1">知识库状态</div>
+                    </div>
+                  </div>
+
+                  {/* 集合列表 */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">集合名称</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">文档数</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">状态</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {allCollections.map((col) => (
+                          <tr key={col.name} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span className="font-medium text-gray-800">{col.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 rounded-full text-sm font-medium ${
+                                col.count > 0
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}>
+                                {col.count} 片段
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                col.count > 0
+                                  ? "bg-green-100 text-green-600"
+                                  : "bg-yellow-100 text-yellow-600"
+                              }`}>
+                                {col.count > 0 ? "已索引" : "空"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setCollectionName(col.name);
+                                    fetchKbInfo();
+                                  }}
+                                  className="px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                                >
+                                  查看
+                                </button>
+                                {col.count > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      setCollectionName(col.name);
+                                      setActiveTab("recall");
+                                    }}
+                                    className="px-3 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
+                                  >
+                                    搜索
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">暂无数据</div>
+              )}
+            </div>
+
+            {/* 当前选中集合详情 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  📁 当前选中: <span className="text-blue-600">{collectionName}</span>
+                </h2>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={collectionName}
                     onChange={(e) => setCollectionName(e.target.value)}
-                    placeholder="知识库名称"
+                    placeholder="输入集合名称"
                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
                     onClick={fetchKbInfo}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
                   >
-                    刷新
+                    切换
                   </button>
                 </div>
               </div>
@@ -460,24 +620,23 @@ export default function KnowledgePage() {
               {loading ? (
                 <div className="text-center py-8 text-gray-500">加载中...</div>
               ) : kbInfo ? (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-blue-600">
-                      {kbInfo.count}
+                <div className="space-y-4">
+                  {/* 集合统计 */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-gray-700">{kbInfo.count}</div>
+                      <div className="text-sm text-gray-500 mt-1">文档片段</div>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">文档片段数</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-green-600">
-                      {kbInfo.exists ? "✅" : "❌"}
+                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-gray-700">{kbInfo.sample_docs?.length || 0}</div>
+                      <div className="text-sm text-gray-500 mt-1">示例文档</div>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">状态</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-purple-600">
-                      {kbInfo.sample_docs?.length || 0}
+                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                      <div className={`text-2xl font-bold ${kbInfo.exists ? "text-green-600" : "text-red-600"}`}>
+                        {kbInfo.exists ? "✅" : "❌"}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">数据库状态</div>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">示例文档</div>
                   </div>
                 </div>
               ) : (
@@ -488,21 +647,36 @@ export default function KnowledgePage() {
             {/* 示例文档 */}
             {kbInfo?.sample_docs && kbInfo.sample_docs.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                  📝 示例文档片段
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">📝 文档片段预览</h2>
+                  <span className="text-sm text-gray-500">共 {kbInfo.sample_docs.length} 条示例</span>
+                </div>
                 <div className="space-y-4">
                   {kbInfo.sample_docs.map((doc, index) => (
                     <div
                       key={doc.id || index}
-                      className="bg-gray-50 rounded-lg p-4"
+                      className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
                     >
-                      <div className="text-sm font-medium text-gray-700 mb-2">
-                        {doc.metadata?.filename
-                          ? doc.metadata.filename.toString()
-                          : `文档 ${index + 1}`}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
+                            #{index + 1}
+                          </span>
+                          <span className="font-medium text-gray-700">
+                            {typeof doc.metadata?.filename === 'string'
+                              ? doc.metadata.filename
+                              : typeof doc.metadata?.source === 'string'
+                              ? doc.metadata.source
+                              : `文档 ${index + 1}`}
+                          </span>
+                        </div>
+                        {typeof doc.metadata?.category === 'string' && (
+                          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded">
+                            {String(doc.metadata.category)}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-sm text-gray-600 line-clamp-3">
+                      <div className="text-sm text-gray-600 line-clamp-3 bg-white rounded p-3 border border-gray-100">
                         {doc.content_preview}
                       </div>
                     </div>
@@ -510,6 +684,43 @@ export default function KnowledgePage() {
                 </div>
               </div>
             )}
+
+            {/* 快速搜索 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">🔍 快速搜索</h2>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={quickSearch}
+                  onChange={(e) => setQuickSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleQuickSearch()}
+                  placeholder="输入关键词快速搜索当前集合..."
+                  className="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleQuickSearch}
+                  className="bg-blue-500 text-white px-6 py-3 rounded-xl hover:bg-blue-600 font-medium transition-colors"
+                >
+                  搜索
+                </button>
+              </div>
+              {quickSearchResults.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm text-gray-500 mb-2">找到 {quickSearchResults.length} 条结果</div>
+                  {quickSearchResults.map((result, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-3 text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-gray-700">#{index + 1}</span>
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded">
+                          相似度: {(result.score * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="text-gray-600 line-clamp-2">{result.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* 危险操作 */}
             <div className="bg-red-50 rounded-xl p-6 border border-red-200">

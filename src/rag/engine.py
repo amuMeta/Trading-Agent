@@ -67,6 +67,7 @@ class RAGConfig:
     persist_directory: str = "./data/chroma_db"
     embedding_model: str = "BAAI/bge-base-zh-v1.5"
     embedding_device: str = "cpu"
+    local_embedding_path: Optional[str] = None
     llm_provider: str = "deepseek"
     llm_model: str = "deepseek-chat"
     llm_temperature: float = 0.7
@@ -97,10 +98,12 @@ class FinanceRAGEngine:
         print(f"[RAG] 配置: embedding={self.config.embedding_model}, llm={self.config.llm_provider}/{self.config.llm_model}")
         
         # ChromaDB客户端
+        print(f"[RAG] ChromaDB path: {self.config.persist_directory}")
         self.client = chromadb.PersistentClient(
             path=self.config.persist_directory,
             settings=ChromaSettings(allow_reset=True, anonymized_telemetry=False)
         )
+        print(f"[RAG] ChromaDB client initialized, collections: {self.client.list_collections()}")
         
         # 初始化LLM
         self._init_llm()
@@ -187,8 +190,9 @@ class FinanceRAGEngine:
         if self._embedding is None:
             try:
                 from sentence_transformers import SentenceTransformer
-                self._embedding = SentenceTransformer(self.config.embedding_model)
-                print(f"[RAG] Embedding模型加载成功")
+                model_name = self.config.local_embedding_path or self.config.embedding_model
+                self._embedding = SentenceTransformer(model_name)
+                print(f"[RAG] Embedding模型加载成功: {model_name}")
             except Exception as e:
                 print(f"[RAG] Embedding不可用 ({e})，使用关键词匹配作为后备方案")
                 self._embedding = None
@@ -457,9 +461,14 @@ class FinanceRAGEngine:
         collection_name: str = "finance_knowledge"
     ) -> List[Dict[str, Any]]:
         """检索相关文档"""
+        self._load_embedding()
+
         try:
             collection = self.client.get_collection(collection_name)
-        except:
+            count = collection.count()
+            print(f"[RAG] Search: collection={collection_name}, count={count}, query={query[:50]}...")
+        except Exception as e:
+            print(f"[RAG] Search: collection '{collection_name}' not found: {e}")
             return []
 
         if self._embedding is None:
@@ -675,6 +684,14 @@ _rag_engine: Optional[FinanceRAGEngine] = None
 def get_rag_engine(config: Optional[RAGConfig] = None) -> FinanceRAGEngine:
     global _rag_engine
     if _rag_engine is None:
+        if config is None:
+            from src.core.paths import PROJECT_ROOT, CHROMA_DB_DIR
+            local_model_path = str(PROJECT_ROOT / "models" / "bge-base-zh-v1.5")
+            config = RAGConfig(
+                local_embedding_path=local_model_path,
+                persist_directory=str(CHROMA_DB_DIR)
+            )
+            print(f"[RAG] Using ChromaDB path: {config.persist_directory}")
         _rag_engine = FinanceRAGEngine(config)
     return _rag_engine
 
@@ -694,12 +711,14 @@ def index_session_reports(
     
     texts, metadatas, errors = [], [], []
     
+    converter = JSONToMarkdownConverter(dump_dir=str(report_dir))
+
     for json_file in sorted(report_dir.glob("session_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)[:100]:
         try:
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            converter = JSONToMarkdownConverter(data)
-            texts.append(converter.to_markdown())
+            markdown_content = converter._generate_markdown(data)
+            texts.append(markdown_content)
             metadatas.append({
                 "session_id": json_file.stem,
                 "user_query": data.get("user_query", "")[:200],
