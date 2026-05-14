@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Sidebar() {
   return (
-    <aside className="min-h-screen w-56 border-r border-gray-200 bg-gray-50 p-4">
+    <aside className="sticky top-0 w-56 h-screen border-r border-gray-200 bg-gray-50 p-4 flex-shrink-0">
       <nav className="space-y-2">
         <Link
           className="block rounded-lg px-4 py-3 font-medium transition-colors bg-gray-100 text-gray-900 hover:bg-blue-500 hover:text-white"
@@ -30,7 +30,6 @@ export default function Sidebar() {
         </Link>
       </nav>
 
-      {/* 提示信息 */}
       <div className="mt-6 p-3 bg-white rounded-lg border border-gray-200">
         <div className="text-xs text-gray-500 mb-2">💡 提示</div>
         <div className="text-xs text-gray-400">
