@@ -5,6 +5,22 @@ const api = axios.create({
   timeout: 30000
 });
 
+api.interceptors.request.use((config) => {
+  console.log("[API Request]", config.method?.toUpperCase(), config.url, config.params);
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => {
+    console.log("[API Response]", response.config.url, response.status);
+    return response;
+  },
+  (error) => {
+    console.error("[API Error]", error.config?.url, error.message);
+    return Promise.reject(error);
+  }
+);
+
 export type SessionSummary = {
   session_id: string;
   status: string;
@@ -65,6 +81,8 @@ export const Api = {
   getAgentConfig: () => api.get("/api/agents/config").then((r) => r.data),
   getStockKline: (stockCode: string, period?: string, limit?: number) =>
     api.get(`/api/stock/kline/${stockCode}`, { params: { period, limit } }).then((r) => r.data),
+  getStockKlineYahoo: (stockCode: string, period?: string, limit?: number) =>
+    api.get(`/api/stock/kline/yahoo/${stockCode}`, { params: { period, limit } }).then((r) => r.data),
   getStockIndicators: (stockCode: string) =>
     api.get(`/api/stock/indicators/${stockCode}`).then((r) => r.data),
   getStockPrice: (stockCode: string) =>
@@ -73,8 +91,12 @@ export const Api = {
     api.get(`/api/stock/money-flow/${stockCode}`, { params: { days } }).then((r) => r.data),
   getStockNews: (stockCode: string, limit?: number) =>
     api.get(`/api/stock/news/${stockCode}`, { params: { limit } }).then((r) => r.data),
+  getStockNewsYahoo: (stockCode: string, limit?: number) =>
+    api.get(`/api/stock/news/yahoo/${stockCode}`, { params: { limit } }).then((r) => r.data),
   getStockInfo: (stockCode: string) =>
     api.get(`/api/stock/info/${stockCode}`).then((r) => r.data),
+  getStockInfoYahoo: (stockCode: string) =>
+    api.get(`/api/stock/info/yahoo/${stockCode}`).then((r) => r.data),
   startAnalysis: (payload: {
     query: string;
     active_agents: string[];
@@ -88,7 +110,7 @@ export const Api = {
   getTasks: () => api.get("/api/analysis/tasks").then((r) => r.data),
   getSessions: (status?: string) =>
     api
-      .get("/api/sessions", { params: status ? { status } : undefined })
+      .get("/api/sessions", { params: status ? { status } : {} })
       .then((r) => r.data),
   getSession: (sessionId: string) =>
     api.get(`/api/sessions/${sessionId}`).then((r) => r.data),

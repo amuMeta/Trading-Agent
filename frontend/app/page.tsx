@@ -37,6 +37,7 @@ export default function HomePage() {
   const [selectedHistoryId, setSelectedHistoryId] = useState("");
   const [analysisError, setAnalysisError] = useState("");
   const [health, setHealth] = useState<{ env_exists: boolean; mcp_config_exists: boolean } | null>(null);
+  const [debugSessions, setDebugSessions] = useState<any[]>([]);
   const [klineData, setKlineData] = useState<any[]>([]);
   const [indicators, setIndicators] = useState<any>(null);
   const [realTimePrice, setRealTimePrice] = useState<any>(null);
@@ -46,15 +47,14 @@ export default function HomePage() {
     console.log('[HomePage] 开始加载K线数据:', stockCode);
     try {
       const [klineRes, indRes, priceRes] = await Promise.all([
-        Api.getStockKline(stockCode, "30d"),
+        Api.getStockKlineYahoo(stockCode, "30d"),
         Api.getStockIndicators(stockCode),
         Api.getStockPrice(stockCode)
       ]);
       console.log('[HomePage] K线响应:', klineRes);
-      // 后端返回格式: { data: { data: [...] } }
-      if (klineRes?.data?.data) {
-        console.log('[HomePage] 设置K线数据，共', klineRes.data.data.length, '条');
-        setKlineData(klineRes.data.data);
+      if (klineRes?.data) {
+        console.log('[HomePage] 设置K线数据，共', klineRes.data.length, '条');
+        setKlineData(klineRes.data);
       } else {
         console.warn('[HomePage] K线数据格式异常:', klineRes);
         setKlineData([]);
@@ -88,8 +88,23 @@ export default function HomePage() {
       setDisplayNames(cfg.display_names ?? {});
       setSelected(cfg.defaults ?? {});
     });
-    Api.getSessions("completed").then((res) => setHistorySessions(res.sessions ?? []));
-    Api.getHealth().then(setHealth).catch(() => setHealth(null));
+    Api.getSessions("completed").then((res) => {
+      console.log("[DEBUG] API returned sessions:", res.sessions?.length);
+      console.log("[DEBUG] Calling setHistorySessions with:", res.sessions);
+      const sessions = res.sessions ?? [];
+      setHistorySessions(sessions);
+      setDebugSessions(sessions);
+    });
+    Api.getHealth().then((res) => {
+      // 将后端返回的checks数组转换为前端期望的格式
+      const checks = res.checks || [];
+      const envFileCheck = checks.find((c: any) => c.name === "env_file");
+      const mcpConfigCheck = checks.find((c: any) => c.name === "mcp_config");
+      setHealth({
+        env_exists: envFileCheck?.status === "ok" || envFileCheck?.status === "warning",
+        mcp_config_exists: mcpConfigCheck?.status === "ok" || mcpConfigCheck?.status === "warning"
+      });
+    }).catch(() => setHealth(null));
   }, [setCapabilities, setConnected, setHistorySessions]);
 
   useEffect(() => {
@@ -253,11 +268,14 @@ export default function HomePage() {
             />
 
             {/* K线图表 */}
-            <PriceChart 
-              data={chartData} 
-              indicators={indicators} 
-              stockCode={query.match(/(\d{6})/)?.[1]} 
-            />
+            <div className="card">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">K线图表</h3>
+              <PriceChart 
+                data={chartData} 
+                indicators={indicators} 
+                stockCode={query.match(/(\d{6})/)?.[1]} 
+              />
+            </div>
             
             {/* 股票数据面板 */}
             {query.match(/(\d{6})/) && (
@@ -303,6 +321,7 @@ export default function HomePage() {
             {/* 历史会话 */}
             <div className="card">
               <h3 className="text-2xl font-bold text-gray-900 mb-8">历史会话</h3>
+              <div className="text-sm text-gray-500 mb-2">共 {debugSessions.length} 个会话 (store: {historySessions.length})</div>
               <select
                 className="w-full rounded-xl border-2 border-gray-200 bg-white p-5 text-gray-900 text-lg focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all cursor-pointer"
                 value={selectedHistoryId}
@@ -316,7 +335,7 @@ export default function HomePage() {
                 }}
               >
                 <option value="">请选择历史会话…</option>
-                {historySessions.map((s: any) => (
+                {debugSessions.map((s: any) => (
                   <option key={s.session_id} value={s.session_id}>
                     {(s.user_query || s.session_id).slice(0, 48)}
                   </option>

@@ -38,9 +38,10 @@ class HealthChecker:
     def check_env_file(self) -> bool:
         """检查环境配置文件"""
         try:
-            env_path = Path(".env")
+            # 使用绝对路径，基于当前文件位置定位项目根目录
+            env_path = Path(__file__).parent.parent.parent / ".env"
             if not env_path.exists():
-                self.add_check("env_file", "warning", "配置文件不存在")
+                self.add_check("env_file", "warning", f"配置文件不存在: {env_path}")
                 return False
 
             required_vars = ["DEEPSEEK_API_KEY", "OPENAI_API_KEY"]
@@ -65,9 +66,10 @@ class HealthChecker:
     def check_mcp_config(self) -> bool:
         """检查MCP配置文件"""
         try:
-            mcp_path = Path("mcp_config.json")
+            # 使用绝对路径
+            mcp_path = Path(__file__).parent.parent.parent / "mcp_config.json"
             if not mcp_path.exists():
-                self.add_check("mcp_config", "warning", "MCP配置文件不存在")
+                self.add_check("mcp_config", "warning", f"MCP配置文件不存在: {mcp_path}")
                 return False
 
             import json

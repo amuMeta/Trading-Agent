@@ -1,3 +1,65 @@
+"""
+API Server 模块 - FastAPI主入口和所有HTTP路由定义
+
+本模块是整个项目的后端API入口（默认端口8000），提供：
+
+【核心功能】
+1. 分析任务管理
+   • POST /api/analysis/start - 启动新的分析任务
+   • POST /api/analysis/{task_id}/cancel - 取消运行中的任务
+   • GET /api/analysis/{task_id}/progress - 获取任务进度
+   • GET /api/analysis/tasks - 获取所有任务列表
+
+2. 会话管理
+   • GET /api/sessions - 获取会话列表
+   • GET /api/sessions/{session_id} - 获取会话详情
+   • GET /api/sessions/{session_id}/agents - 获取会话中智能体结果
+
+3. 系统信息
+   • GET /api/system/health - 系统健康检查
+   • GET /api/system/capabilities - 获取系统能力（智能体数量、工具数量等）
+   • GET /api/agents/config - 获取智能体配置
+
+4. 股票数据（代理到stock-mcp服务）
+   • GET /api/stock/kline/{stock_code} - K线数据
+   • GET /api/stock/indicators/{stock_code} - 技术指标
+   • GET /api/stock/price/{stock_code} - 实时价格
+   • GET /api/stock/news/{stock_code} - 股票新闻
+   • GET /api/stock/money-flow/{stock_code} - 资金流向
+
+5. 报告导出
+   • POST /api/exports/markdown - 导出Markdown报告
+   • POST /api/exports/pdf - 导出PDF报告
+   • POST /api/exports/docx - 导出Word报告
+
+6. WebSocket实时通信
+   • WS /ws/analysis/{task_id} - 订阅指定任务的实时进度
+   • WS /ws/all - 订阅所有任务的广播
+
+【架构设计】
+• 使用FastAPI异步框架
+• 任务在后台线程中执行（不阻塞HTTP请求）
+• 使用threading + asyncio混合模式
+• 支持CORS跨域请求
+• 内置速率限制中间件
+
+【任务生命周期】
+1. POST /api/analysis/start → 创建TaskRecord → 返回task_id
+2. 后台线程运行 WorkflowOrchestrator.run_analysis()
+3. 前端轮询 GET /api/analysis/{task_id}/progress
+4. 任务完成后，结果保存到 storage/sessions/session_*.json
+
+【关键类】
+• StartAnalysisReq: 分析请求数据模型
+• TaskRecord: 任务记录（包含状态、进度、session_id）
+• TASKS: 全局任务字典（task_id → TaskRecord）
+• TASK_LOCK: 线程安全锁
+
+【环境变量】
+• MAX_CONCURRENT_ANALYSIS: 最大并发任务数（默认2）
+• RATE_LIMIT_ENABLED: 是否启用速率限制
+"""
+
 import asyncio
 import json
 import logging
@@ -45,6 +107,15 @@ MAX_RECENT_MINUTES = 5
 
 
 def get_agent_display_name(agent_name: str) -> str:
+    """
+    获取智能体的中文显示名称
+
+    Args:
+        agent_name: 智能体英文名称
+
+    Returns:
+        str: 智能体中文名称
+    """
     mapping = {
         "company_overview_analyst": "公司概述分析师",
         "market_analyst": "市场分析师",
@@ -66,6 +137,15 @@ def get_agent_display_name(agent_name: str) -> str:
 
 
 def list_session_files() -> List[Path]:
+    """
+    列出所有会话文件（按修改时间倒序）
+
+    会话文件命名格式：session_{session_id}.json
+    排除损坏的文件（.corrupted, .bad, .broken后缀）
+
+    Returns:
+        List[Path]: 会话文件路径列表
+    """
     if not DUMP_DIR.exists():
         return []
     return sorted(
@@ -80,6 +160,15 @@ def list_session_files() -> List[Path]:
 
 
 def read_json(path: Path) -> Optional[Dict[str, Any]]:
+    """
+    读取并解析JSON文件
+
+    Args:
+        path: JSON文件路径
+
+    Returns:
+        Optional[Dict]: 解析后的字典，失败返回None
+    """
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -89,6 +178,16 @@ def read_json(path: Path) -> Optional[Dict[str, Any]]:
 
 
 def parse_session_progress(sf: Path) -> Optional[Dict[str, Any]]:
+    """
+    解析会话文件，获取进度信息
+
+    Args:
+        sf: 会话文件路径
+
+    Returns:
+        Optional[Dict]: 包含session_id, status, progress等字段的字典
+                       解析失败返回None
+    """
     try:
         data = read_json(sf)
         agents = data.get("agents", [])
@@ -853,6 +952,34 @@ async def get_stock_kline(stock_code: str, period: str = "30d"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/stock/kline/tencent/{stock_code}")
+async def get_stock_kline_tencent(stock_code: str, period: str = "30d"):
+    """获取股票K线数据 - 腾讯财经数据源"""
+    from src.mcp.http_client import TencentHTTPClient
+    try:
+        client = TencentHTTPClient()
+        result = client.get_kline_data(stock_code, period=period)
+        if not result or "error" in result:
+            return {"error": result.get("error", "No data available") if result else "No data available"}
+        return {"stock_code": stock_code, "period": period, "data": result.get("data", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stock/kline/yahoo/{stock_code}")
+async def get_stock_kline_yahoo(stock_code: str, period: str = "30d"):
+    """获取股票K线数据 - Yahoo Finance数据源"""
+    from src.mcp.http_client import YahooFinanceHTTPClient
+    try:
+        client = YahooFinanceHTTPClient()
+        result = client.get_kline_data(stock_code, period=period)
+        if not result or "error" in result:
+            return {"error": result.get("error", "No data available") if result else "No data available"}
+        return {"stock_code": stock_code, "period": period, "data": result.get("data", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/stock/indicators/{stock_code}")
 async def get_stock_indicators(stock_code: str):
     """获取股票技术指标"""
@@ -905,6 +1032,20 @@ async def get_news(stock_code: str, limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/stock/news/yahoo/{stock_code}")
+async def get_news_yahoo(stock_code: str, limit: int = 10):
+    """获取股票新闻 - Alpha Vantage数据源"""
+    from src.mcp.http_client import YahooFinanceHTTPClient
+    try:
+        client = YahooFinanceHTTPClient()
+        result = client.get_stock_news_alpha(stock_code, limit=limit)
+        if not result or "error" in result:
+            return {"stock_code": stock_code, "news": []}
+        return {"stock_code": stock_code, "news": result.get("news", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/stock/info/{stock_code}")
 async def get_stock_info(stock_code: str):
     """获取公司基本信息"""
@@ -914,6 +1055,20 @@ async def get_stock_info(stock_code: str):
         if not data:
             return {"error": "No info available"}
         return {"stock_code": stock_code, "info": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stock/info/yahoo/{stock_code}")
+async def get_stock_info_yahoo(stock_code: str):
+    """获取公司基本信息 - Alpha Vantage数据源"""
+    from src.mcp.http_client import YahooFinanceHTTPClient
+    try:
+        client = YahooFinanceHTTPClient()
+        result = client.get_company_info(stock_code)
+        if not result or "error" in result:
+            return {"stock_code": stock_code, "info": {}}
+        return {"stock_code": stock_code, "info": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

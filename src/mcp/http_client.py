@@ -2,6 +2,7 @@ import os
 import requests
 import re
 import time
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from functools import wraps
 
@@ -474,3 +475,396 @@ class StockMCPHTTPClient:
             return tool_mapping[tool_name]()
         else:
             return {"error": f"Unknown tool: {tool_name}"}
+
+
+def normalize_stock_code_to_tencent(user_input: str) -> str:
+    """将用户输入转换为腾讯财经需要的格式"""
+    if not user_input:
+        return ""
+    user_input = user_input.strip()
+    if user_input.startswith(("sh", "sz")):
+        return user_input
+    code = re.findall(r"\d{6}", user_input)
+    if code:
+        code = code[0]
+        if code.startswith(("6", "9")):
+            return f"sh{code}"
+        else:
+            return f"sz{code}"
+    return user_input
+
+
+class TencentHTTPClient:
+    """腾讯财经数据源HTTP客户端"""
+
+    BASE_URL = "https://web.ifzjq.gtimg.cn/appstock/app/fqkline/get"
+
+    def __init__(self, use_cache: bool = True):
+        self.session = requests.Session()
+        self._use_cache = use_cache and CACHE_ENABLED
+        self._cache = get_mcp_cache() if self._use_cache else None
+
+    def _get_cached(self, tool_name: str, params: Dict, fallback_func) -> Dict:
+        if self._use_cache and self._cache:
+            cached = self._cache.get(tool_name, params)
+            if cached is not None:
+                return cached
+        result = fallback_func()
+        if self._use_cache and self._cache and "error" not in result:
+            self._cache.set(tool_name, params, result)
+        return result
+
+    def _parse_period(self, period: str) -> tuple:
+        """解析period参数，返回(type, days)"""
+        if period.endswith("d"):
+            days = int(period[:-1])
+            if days <= 5:
+                return ("day", 5)
+            elif days <= 20:
+                return ("day", days)
+            elif days <= 60:
+                return ("week", days // 7 + 1)
+            else:
+                return ("month", days // 30 + 1)
+        elif period.endswith("w"):
+            return ("week", int(period[:-1]))
+        elif period.endswith("m"):
+            return ("month", int(period[:-1]))
+        return ("day", 30)
+
+    def get_kline_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> Dict:
+        """获取K线数据"""
+        params = {"symbol": symbol, "period": period}
+        tencent_symbol = normalize_stock_code_to_tencent(symbol)
+        period_type, limit = self._parse_period(period)
+        if limit > 320:
+            limit = 320
+
+        def _fetch():
+            url = f"{self.BASE_URL}?_var=kline_{period_type}&param={tencent_symbol},{period_type},,,,,{limit},qfq&r=0.1"
+            try:
+                response = self.session.get(url, timeout=30)
+                response.raise_for_status()
+                text = response.text
+                return self._parse_tencent_response(text)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("tencent_kline_data", params, _fetch)
+
+    def _parse_tencent_response(self, text: str) -> Dict:
+        """解析腾讯财经K线数据响应"""
+        try:
+            import json
+            match = re.search(r"=(.+)$", text)
+            if not match:
+                return {"error": "Invalid response format"}
+            data = json.loads(match.group(1))
+            qfqkey = data.get("qfqkey", "")
+            data_list = data.get("data", {}).get(qfqkey, {}).get("day", [])
+            if not data_list:
+                return {"error": "No data available"}
+            result = []
+            for item in data_list:
+                if len(item) >= 5:
+                    result.append({
+                        "timestamp": item[0],
+                        "open": float(item[1]),
+                        "high": float(item[2]),
+                        "low": float(item[3]),
+                        "close": float(item[4]),
+                        "volume": float(item[5]) if len(item) > 5 else 0
+                    })
+            return {"data": result}
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
+
+
+def normalize_stock_code_to_yahoo(user_input: str) -> str:
+    """将用户输入转换为Yahoo Finance需要的格式"""
+    if not user_input:
+        return ""
+    user_input = user_input.strip()
+    if user_input.endswith((".SS", ".SZ", ".NY", ".OB")):
+        return user_input
+    code = re.findall(r"\d{6}", user_input)
+    if code:
+        code = code[0]
+        if code.startswith(("6", "9")):
+            return f"{code}.SS"
+        else:
+            return f"{code}.SZ"
+    return user_input
+
+
+class YahooFinanceHTTPClient:
+    """Yahoo Finance数据源HTTP客户端"""
+
+    BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
+
+    def __init__(self, use_cache: bool = True):
+        self.session = requests.Session()
+        self._use_cache = use_cache and CACHE_ENABLED
+        self._cache = get_mcp_cache() if self._use_cache else None
+
+    def _get_cached(self, tool_name: str, params: Dict, fallback_func) -> Dict:
+        if self._use_cache and self._cache:
+            cached = self._cache.get(tool_name, params)
+            if cached is not None:
+                return cached
+        result = fallback_func()
+        if self._use_cache and self._cache and "error" not in result:
+            self._cache.set(tool_name, params, result)
+        return result
+
+    def _parse_period_to_range(self, period: str) -> str:
+        """将period转换为Yahoo Finance的range参数"""
+        if period.endswith("d"):
+            days = int(period[:-1])
+            if days <= 5:
+                return "5d"
+            elif days <= 30:
+                return "1mo"
+            elif days <= 90:
+                return "3mo"
+            elif days <= 180:
+                return "6mo"
+            elif days <= 365:
+                return "1y"
+            else:
+                return "2y"
+        elif period.endswith("w"):
+            return "1mo"
+        elif period.endswith("m"):
+            months = int(period[:-1])
+            if months <= 1:
+                return "1mo"
+            elif months <= 3:
+                return "3mo"
+            elif months <= 6:
+                return "6mo"
+            elif months <= 12:
+                return "1y"
+            else:
+                return "2y"
+        return "1mo"
+
+    def get_kline_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> Dict:
+        """获取K线数据"""
+        params = {"symbol": symbol, "period": period}
+        yahoo_symbol = normalize_stock_code_to_yahoo(symbol)
+        range_param = self._parse_period_to_range(period)
+
+        def _fetch():
+            url = f"{self.BASE_URL}/{yahoo_symbol}"
+            try:
+                response = self.session.get(
+                    url,
+                    params={"interval": "1d", "range": range_param},
+                    timeout=30,
+                    headers={"User-Agent": "Mozilla/5.0"}
+                )
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_yahoo_response(data)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("yahoo_kline_data", params, _fetch)
+
+    def _parse_yahoo_response(self, data: Dict) -> Dict:
+        """解析Yahoo Finance K线数据响应"""
+        try:
+            result = data.get("chart", {}).get("result", [])
+            if not result:
+                return {"error": "No data available"}
+            item = result[0]
+            timestamps = item.get("timestamp", [])
+            quote = item.get("indicators", {}).get("quote", [{}])[0]
+            if not timestamps:
+                return {"error": "No timestamp data"}
+            result_data = []
+            for i, ts in enumerate(timestamps):
+                result_data.append({
+                    "timestamp": str(ts),
+                    "time": datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if ts else "",
+                    "open": quote.get("open", [0])[i] if quote.get("open") else 0,
+                    "high": quote.get("high", [0])[i] if quote.get("high") else 0,
+                    "low": quote.get("low", [0])[i] if quote.get("low") else 0,
+                    "close": quote.get("close", [0])[i] if quote.get("close") else 0,
+                    "volume": quote.get("volume", [0])[i] if quote.get("volume") else 0,
+                })
+            return {"data": result_data}
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
+
+    def get_company_info(self, symbol: str) -> Dict:
+        """获取公司基本信息 - 使用 Yahoo Finance chart API"""
+        params = {"symbol": symbol}
+        yahoo_symbol = normalize_stock_code_to_yahoo(symbol)
+
+        def _fetch():
+            try:
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}"
+                response = self.session.get(
+                    url,
+                    params={"interval": "1d", "range": "1d"},
+                    timeout=30,
+                    headers={"User-Agent": "Mozilla/5.0"}
+                )
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_company_info_from_chart(data)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("yahoo_company_info", params, _fetch)
+
+    def _parse_company_info_from_chart(self, data: Dict) -> Dict:
+        """从 Yahoo Finance chart API 解析公司基本信息"""
+        try:
+            result = data.get("chart", {}).get("result", [])
+            if not result:
+                return {"error": "No data available"}
+            item = result[0]
+            meta = item.get("meta", {})
+            return {
+                "name": meta.get("longName", "") or meta.get("shortName", "") or "",
+                "industry": "",
+                "sector": "",
+                "market_cap": 0,
+                "currency": meta.get("currency", "USD"),
+                "price": meta.get("regularMarketPrice", 0) or 0,
+                "exchange": meta.get("exchangeName", ""),
+                "list_date": "",
+                "summary": "",
+                "pe_ratio": 0,
+                "ebitda": 0,
+                "week52_high": meta.get("fiftyTwoWeekHigh", 0) or 0,
+                "week52_low": meta.get("fiftyTwoWeekLow", 0) or 0,
+            }
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
+
+    def get_stock_news(self, symbol: str, limit: int = 10) -> Dict:
+        """获取股票最新资讯"""
+        params = {"symbol": symbol, "limit": limit}
+        yahoo_symbol = normalize_stock_code_to_yahoo(symbol)
+
+        def _fetch():
+            try:
+                url = f"https://query2.finance.yahoo.com/v1/finance/news"
+                response = self.session.get(
+                    url,
+                    params={"symbols": yahoo_symbol, "news": limit},
+                    timeout=30,
+                    headers={"User-Agent": "Mozilla/5.0"}
+                )
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_news(data)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("yahoo_stock_news", params, _fetch)
+
+    def _parse_news(self, data: Dict) -> Dict:
+        """解析股票资讯"""
+        try:
+            news_list = data.get("news", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            if not news_list:
+                return {"news": []}
+            result = []
+            for item in news_list[:limit]:
+                result.append({
+                    "title": item.get("title", ""),
+                    "pub_date": item.get("pubDate", ""),
+                    "source": item.get("publisher", ""),
+                    "url": item.get("link", item.get("url", "")),
+                    "content": item.get("description", item.get("summary", "")),
+                })
+            return {"news": result}
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
+
+    def get_company_info_alpha(self, symbol: str) -> Dict:
+        """使用 Alpha Vantage 获取公司基本信息"""
+        ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "XAH6LSH8ZZHDFONF")
+        params = {"symbol": symbol}
+
+        def _fetch():
+            try:
+                url = "https://www.alphavantage.co/query"
+                response = self.session.get(
+                    url,
+                    params={"function": "OVERVIEW", "symbol": symbol, "apikey": ALPHA_VANTAGE_KEY},
+                    timeout=30
+                )
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_alpha_company_info(data)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("alpha_company_info", params, _fetch)
+
+    def _parse_alpha_company_info(self, data: Dict) -> Dict:
+        """解析 Alpha Vantage 公司信息"""
+        try:
+            if not data.get("Symbol"):
+                return {"error": "No data available"}
+            return {
+                "name": data.get("Name", ""),
+                "industry": data.get("Industry", ""),
+                "sector": data.get("Sector", ""),
+                "market_cap": int(data.get("MarketCapitalization", 0)) if data.get("MarketCapitalization") else 0,
+                "currency": data.get("Currency", "USD"),
+                "price": float(data.get("AnalystTargetPrice", 0)) if data.get("AnalystTargetPrice") else 0,
+                "exchange": data.get("Exchange", ""),
+                "list_date": data.get(" IPODate", ""),
+                "summary": data.get("Description", ""),
+                "pe_ratio": float(data.get("PERatio", 0)) if data.get("PERatio") else 0,
+                "ebitda": int(data.get("EBITDA", 0)) if data.get("EBITDA") else 0,
+            }
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
+
+    def get_stock_news_alpha(self, symbol: str, limit: int = 10) -> Dict:
+        """使用 Alpha Vantage 获取股票新闻"""
+        ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "XAH6LSH8ZZHDFONF")
+        params = {"symbol": symbol, "limit": limit}
+
+        def _fetch():
+            try:
+                url = "https://www.alphavantage.co/query"
+                response = self.session.get(
+                    url,
+                    params={"function": "NEWS_SENTIMENT", "tickers": symbol, "apikey": ALPHA_VANTAGE_KEY, "limit": limit},
+                    timeout=30
+                )
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_alpha_news(data, limit)
+            except Exception as e:
+                return {"error": str(e)}
+
+        return self._get_cached("alpha_stock_news", params, _fetch)
+
+    def _parse_alpha_news(self, data: Dict, limit: int) -> Dict:
+        """解析 Alpha Vantage 新闻"""
+        try:
+            feed = data.get("feed", [])
+            if not feed:
+                return {"news": []}
+            result = []
+            for item in feed[:limit]:
+                result.append({
+                    "title": item.get("title", ""),
+                    "pub_date": item.get("time_published", ""),
+                    "source": item.get("source", ""),
+                    "url": item.get("url", ""),
+                    "content": item.get("summary", ""),
+                })
+            return {"news": result}
+        except Exception as e:
+            return {"error": f"Parse error: {e}"}
